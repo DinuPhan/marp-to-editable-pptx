@@ -1,5 +1,8 @@
 # Marp to Editable PPTX
 
+> **Standalone CLI PoC:** Convert Markdown without VS Code. See
+> [setup, usage, and limitations](docs/cli-poc.md).
+
 [![Install](https://img.shields.io/badge/VS%20Code-Install-007ACC?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=KatsuYuzu.marp-to-editable-pptx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 

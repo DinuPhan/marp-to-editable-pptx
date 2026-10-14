@@ -279,6 +279,21 @@ describe('generateNativePptx', () => {
     expect(String(originLookup?.[0])).not.toContain('data-marpit-pagination')
   })
 
+  it('launches Firefox using BiDi without Chromium flags', async () => {
+    await generateNativePptx({
+      htmlPath: '/tmp/test.html',
+      browserPath: '/usr/bin/firefox',
+      engine: 'firefox',
+    })
+    expect(mockLaunch).toHaveBeenCalledWith(expect.objectContaining({
+      browser: 'firefox',
+      protocol: 'webDriverBiDi',
+      executablePath: '/usr/bin/firefox',
+      args: [],
+    }))
+    expect(mockClose).toHaveBeenCalled()
+  })
+
   it('uses specified viewport size', async () => {
     await generateNativePptx({
       htmlPath: '/tmp/test.html',

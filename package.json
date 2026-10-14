@@ -26,6 +26,9 @@
     "onCommand:marpToEditablePptx.export"
   ],
   "main": "./dist/extension.js",
+  "bin": {
+    "marp-editable": "./lib/cli.cjs"
+  },
   "contributes": {
     "commands": [
       {
@@ -36,6 +39,8 @@
     ]
   },
   "scripts": {
+    "build:cli": "node src/native-pptx/scripts/generate-dom-walker-script.js && node scripts/build-cli.js",
+    "cli": "node lib/cli.cjs",
     "vscode:prepublish": "npm run build:prod",
     "build": "node src/native-pptx/scripts/generate-dom-walker-script.js && webpack --config webpack.config.js && node scripts/copy-marp-cli-assets.js",
     "build:prod": "node src/native-pptx/scripts/generate-dom-walker-script.js && webpack --config webpack.config.js --env production && node scripts/copy-marp-cli-assets.js",

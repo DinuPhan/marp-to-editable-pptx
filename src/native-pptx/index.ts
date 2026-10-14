@@ -8,8 +8,10 @@ import type { ImageElement, SlideData, SlideElement } from './types'
 export interface NativePptxOptions {
   /** Absolute path to the HTML file rendered by Marp CLI. */
   htmlPath: string
-  /** Absolute path to a Chromium-based browser executable. */
+  /** Absolute path to a Chrome/Chromium or Firefox executable. */
   browserPath: string
+  /** Rendering engine (default: chrome). Firefox uses WebDriver BiDi. */
+  engine?: 'chrome' | 'firefox'
   /** Slide viewport width in pixels (default: 1280). */
   width?: number
   /** Slide viewport height in pixels (default: 720). */
@@ -82,8 +84,10 @@ export async function generateNativePptx(
   try {
     browser = await puppeteer.launch({
       executablePath: browserPath,
+      browser: opts.engine ?? 'chrome',
+      protocol: opts.engine === 'firefox' ? 'webDriverBiDi' : 'cdp',
       headless: true,
-      args: [
+      args: opts.engine === 'firefox' ? [] : [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
