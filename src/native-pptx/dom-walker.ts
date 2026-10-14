@@ -1401,35 +1401,18 @@ export function extractSlides(root: ParentNode = document): SlideData[] {
             for (const preChild of Array.from(li.children)) {
               const preChildTag = preChild.tagName.toLowerCase()
               if (preChildTag !== 'pre' && preChildTag !== 'marp-pre') continue
-              if (preChild.querySelector('svg')) continue // handled as image
               const preRect = preChild.getBoundingClientRect()
               if (preRect.width <= 0 || preRect.height <= 0) continue
-              const preStyle = getComputedStyle(preChild)
-              const codeEl = preChild.querySelector('code')
-              const codeTarget = codeEl ?? preChild
-              // Resolve background: prefer <pre>, fall back to <code>
-              const preBg = preStyle.backgroundColor
-              const codeBg = (preBg && preBg !== 'transparent' && preBg !== 'rgba(0, 0, 0, 0)' && preBg !== 'rgba(0,0,0,0)')
-                ? preBg
-                : (codeEl ? getComputedStyle(codeEl).backgroundColor : preBg)
-              const preCodeRuns = extractCodeRuns(codeTarget)
-              const preScaleFactor = computeAutoScaleFactor(preCodeRuns, preStyle, preRect.height)
-              const preBaseStyle = extractTextStyle(preStyle)
-              const preAdjustedFs = applyAutoScale(preCodeRuns, preBaseStyle.fontSize, preScaleFactor)
               elements.push({
-                type: 'code',
-                text: codeTarget.textContent ?? '',
-                language: codeEl?.className?.replace('language-', '') ?? '',
-                runs: preCodeRuns,
+                type: 'image',
+                src: '',
+                naturalWidth: preRect.width,
+                naturalHeight: preRect.height,
                 x: preRect.left - slideRect.left,
                 y: preRect.top - slideRect.top,
                 width: preRect.width,
                 height: preRect.height,
-                style: {
-                  ...preBaseStyle,
-                  fontSize: preAdjustedFs,
-                  backgroundColor: codeBg,
-                },
+                rasterize: true,
               })
             }
           }
@@ -1490,7 +1473,7 @@ export function extractSlides(root: ParentNode = document): SlideData[] {
               // Check if this <li> has embedded code blocks
               const liCodeChildren = Array.from(li.children).filter((c) => {
                 const t = c.tagName.toLowerCase()
-                return (t === 'pre' || t === 'marp-pre') && !c.querySelector('svg')
+                return t === 'pre' || t === 'marp-pre'
               })
               // Normal <li>: accumulate into the running sub-list
               const liItems = extractListItemEl(
@@ -1513,35 +1496,20 @@ export function extractSlides(root: ParentNode = document): SlideData[] {
                 pendingBottom = firstCodeRect.top - slideRect.top
                 pendingItems.push(...liItems)
                 flushPending()
-                // Emit code block shapes
+                // Emit code block shapes as rasterized images
                 for (const preChild of liCodeChildren) {
                   const preRect = preChild.getBoundingClientRect()
                   if (preRect.width <= 0 || preRect.height <= 0) continue
-                  const preStyle = getComputedStyle(preChild)
-                  const codeEl = preChild.querySelector('code')
-                  const codeTarget = codeEl ?? preChild
-                  const preBg = preStyle.backgroundColor
-                  const codeBg = (preBg && preBg !== 'transparent' && preBg !== 'rgba(0, 0, 0, 0)' && preBg !== 'rgba(0,0,0,0)')
-                    ? preBg
-                    : (codeEl ? getComputedStyle(codeEl).backgroundColor : preBg)
-                  const preCodeRuns = extractCodeRuns(codeTarget)
-                  const preScaleFactor = computeAutoScaleFactor(preCodeRuns, preStyle, preRect.height)
-                  const preBaseStyle = extractTextStyle(preStyle)
-                  const preAdjustedFs = applyAutoScale(preCodeRuns, preBaseStyle.fontSize, preScaleFactor)
                   elements.push({
-                    type: 'code',
-                    text: codeTarget.textContent ?? '',
-                    language: codeEl?.className?.replace('language-', '') ?? '',
-                    runs: preCodeRuns,
+                    type: 'image',
+                    src: '',
+                    naturalWidth: preRect.width,
+                    naturalHeight: preRect.height,
                     x: preRect.left - slideRect.left,
                     y: preRect.top - slideRect.top,
                     width: preRect.width,
                     height: preRect.height,
-                    style: {
-                      ...preBaseStyle,
-                      fontSize: preAdjustedFs,
-                      backgroundColor: codeBg,
-                    },
+                    rasterize: true,
                   })
                 }
               }
@@ -1599,79 +1567,19 @@ export function extractSlides(root: ParentNode = document): SlideData[] {
         })
         elements.push(...extractNestedImages(child, slideRect))
       } else if (tag === 'pre' || tag === 'marp-pre') {
-        // If the <pre> contains a rendered SVG (e.g. Mermaid diagram), treat
-        // it as an SVG image rather than a code block.
-        const innerSvg = child.querySelector('svg')
-        if (innerSvg) {
-          try {
-            const svgStr = new XMLSerializer().serializeToString(innerSvg)
-            const b64 = btoa(unescape(encodeURIComponent(svgStr)))
-            const dataUrl = `data:image/svg+xml;base64,${b64}`
-            elements.push({
-              type: 'image',
-              src: dataUrl,
-              naturalWidth: base.width,
-              naturalHeight: base.height,
-              ...base,
-              // Request rasterization: Mermaid SVGs may use <foreignObject>
-              // for text labels which PowerPoint cannot render from SVG data.
-              // pageX/pageY are intentionally omitted: rasterizeSlideTargets
-              // computes the absolute clip from the slide-relative x/y after
-              // navigating to the correct slide (avoids stale bespoke-transform
-              // coordinates).
-              rasterize: true,
-            })
-          } catch {
-            // Fall through to code block if SVG serialization fails
-            const code = child.querySelector('code')
-            const codeTarget = code ?? child
-            // Resolve background: prefer <pre>, fall back to <code>
-            const preBgCatch = style.backgroundColor
-            const codeBgCatch = (preBgCatch && preBgCatch !== 'transparent' && preBgCatch !== 'rgba(0, 0, 0, 0)' && preBgCatch !== 'rgba(0,0,0,0)')
-              ? preBgCatch
-              : (code ? getComputedStyle(code).backgroundColor : preBgCatch)
-            const codeRunsCatch = extractCodeRuns(codeTarget)
-            const scaleFactorCatch = computeAutoScaleFactor(codeRunsCatch, style, rect.height)
-            const baseStyleCatch = extractTextStyle(style)
-            const adjustedFsCatch = applyAutoScale(codeRunsCatch, baseStyleCatch.fontSize, scaleFactorCatch)
-            elements.push({
-              type: 'code',
-              text: codeTarget.textContent ?? '',
-              language: code?.className?.replace('language-', '') ?? '',
-              runs: codeRunsCatch,
-              ...base,
-              style: {
-                ...baseStyleCatch,
-                fontSize: adjustedFsCatch,
-                backgroundColor: codeBgCatch,
-              },
-            })
-          }
-        } else {
-          const code = child.querySelector('code')
-          const codeTarget = code ?? child
-          // Resolve background: prefer <pre>, fall back to <code>
-          const preBgStd = style.backgroundColor
-          const codeBgStd = (preBgStd && preBgStd !== 'transparent' && preBgStd !== 'rgba(0, 0, 0, 0)' && preBgStd !== 'rgba(0,0,0,0)')
-            ? preBgStd
-            : (code ? getComputedStyle(code).backgroundColor : preBgStd)
-          const codeRuns = extractCodeRuns(codeTarget)
-          const scaleFactor = computeAutoScaleFactor(codeRuns, style, rect.height)
-          const baseStyle = extractTextStyle(style)
-          const adjustedFontSize = applyAutoScale(codeRuns, baseStyle.fontSize, scaleFactor)
-          elements.push({
-            type: 'code',
-            text: codeTarget.textContent ?? '',
-            language: code?.className?.replace('language-', '') ?? '',
-            runs: codeRuns,
-            ...base,
-            style: {
-              ...baseStyle,
-              fontSize: adjustedFontSize,
-              backgroundColor: codeBgStd,
-            },
-          })
-        }
+        // Always rasterize pre/code blocks and Mermaid diagrams as screenshots.
+        // DOM-walking inner spans causes layout overflow and overlapping in PPTX
+        // due to font metric differences between browser and PowerPoint.
+        // The slide-relative x/y/width/height are captured here; the rasterizer
+        // in index.ts navigates to the correct slide and screenshots the region.
+        elements.push({
+          type: 'image',
+          src: '',  // placeholder — filled by buildCodeRasterizeJobs
+          naturalWidth: base.width,
+          naturalHeight: base.height,
+          ...base,
+          rasterize: true,
+        })
       } else if (tag === 'img') {
         const img = child as HTMLImageElement
         // Emoji library images (Twemoji etc.) are captured as text by
@@ -1740,6 +1648,15 @@ export function extractSlides(root: ParentNode = document): SlideData[] {
             ...(paddingTop || paddingRight || paddingBottom || paddingLeft
               ? { paddingTop, paddingRight, paddingBottom, paddingLeft }
               : {}),
+            // Capture background color so the slide builder can render a filled
+            // shape (e.g. blue call-out boxes via blockquote in Ericsson theme).
+            // Firefox resolves CSS custom properties correctly at runtime.
+            ...(() => {
+              const bqBg = style.backgroundColor
+              return bqBg && bqBg !== 'transparent' && bqBg !== 'rgba(0, 0, 0, 0)' && bqBg !== 'rgba(0,0,0,0)'
+                ? { backgroundColor: bqBg }
+                : {}
+            })(),
           },
           ...(borderWidth > 0
             ? { borderLeft: { width: borderWidth, color: borderColor } }

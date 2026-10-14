@@ -1144,6 +1144,17 @@ export function placeElement(
           },
         )
       } else {
+        // Emit a filled background rectangle when the blockquote has a
+        // backgroundColor (e.g. blue call-out box via Ericsson theme).
+        const bqBg = (el.style as any).backgroundColor
+        const hasBqBg = bqBg && !isTransparent(bqBg)
+        if (hasBqBg) {
+          slide.addShape('rect', {
+            x, y, w, h,
+            fill: { color: rgbToHex(bqBg) },
+            line: { type: 'none' },
+          })
+        }
         slide.addText(
           el.runs.map(toTP),
           {
@@ -1305,8 +1316,15 @@ export function placeElement(
               let textArray: any[]
               if (cell.paragraphs && cell.paragraphs.length > 0) {
                 textArray = cell.paragraphs.flatMap((para, pIdx) => {
-                  const paraRuns: any[] = para.runs
-                    .filter((r) => !r.breakLine)
+                  // Firefox DOM walker may produce [null] in para.runs when the
+                  // paragraph run extraction fails; fall back to cell.runs in
+                  // that case, which always contains the correct flattened runs.
+                  const effectiveRuns =
+                    para.runs.every((r: any) => r == null) && cell.runs && cell.runs.length > 0
+                      ? cell.runs
+                      : para.runs
+                  const paraRuns: any[] = effectiveRuns
+                    .filter((r: any) => r != null && !r.breakLine)
                     .map(runToTextProp)
                   // Emit at least one entry per paragraph so PptxGenJS creates
                   // an empty <a:p> (visible as a blank line in the cell).
@@ -1495,6 +1513,7 @@ export function placeElement(
         y,
         w,
         h,
+        sizing: { type: 'contain', w, h },
         ...resolveImageSource(el.src),
       }
       slide.addImage(imgOpts)

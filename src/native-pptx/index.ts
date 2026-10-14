@@ -96,7 +96,7 @@ export async function generateNativePptx(
     })
 
     const page = await browser.newPage()
-    await page.setViewport({ width, height })
+    await page.setViewport({ width, height, deviceScaleFactor: 2 })
 
     // Navigate to the HTML file using a file:// URL so that relative paths
     // (e.g. images referenced as "./image.png") resolve correctly against
